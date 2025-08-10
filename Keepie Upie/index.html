@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keepie Upie - Soccer Ball Game</title>
+    <!-- Google Sign-In -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #87CEEB, #98FB98);
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin: 20px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        #gameCanvas {
+            border: 4px solid #2c3e50;
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
+            max-width: 90vw;
+            max-height: 70vh;
+        }
+
+        #gameInfo {
+            display: flex;
+            gap: 30px;
+            margin: 20px 0;
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        #controls {
+            text-align: center;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+
+        .score {
+            background: rgba(255,255,255,0.8);
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.95);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            display: none;
+        }
+        /* Start Overlay */
+        #startOverlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.95);
+            padding: 50px 60px;
+            border-radius: 25px;
+            text-align: center;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+            display: block;
+            z-index: 1050;
+        }
+        #startOverlay h2 { margin-top: 0; font-size: 42px; letter-spacing: 1px; color:#2c3e50; }
+        #startOverlay p { margin: 10px 0 25px; font-size:18px; color:#555; }
+        
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        #powerupTimers {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #2c3e50;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .timer {
+            background: rgba(255,255,255,0.9);
+            padding: 5px 10px;
+            margin: 2px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .timer.double-points { border-left: 4px solid #FFD700; }
+        .timer.big-ball { border-left: 4px solid #32CD32; }
+        .timer.fast-crouch { border-left: 4px solid #9932CC; }
+        .timer.coin-multiplier { border-left: 4px solid #9932CC; }
+        
+        /* Health and Shield Bars */
+        #healthBarsContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 15px 0;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .bar-background {
+            flex: 1;
+            height: 20px;
+            background: #333333;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #ffffff;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 8px;
+            transition: width 0.3s ease;
+        }
+
+        .health-fill {
+            background: linear-gradient(90deg, #00FF00, #32CD32);
+        }
+
+        .health-fill.low {
+            background: linear-gradient(90deg, #FFFF00, #FFA500);
+        }
+
+        .health-fill.critical {
+            background: linear-gradient(90deg, #FF0000, #FF4500);
+        }
+
+        .shield-fill {
+            background: linear-gradient(90deg, #00FFFF, #1E90FF);
+        }
+
+        /* New: Level bar fill styling */
+        .level-fill {
+            background: linear-gradient(90deg, #8A2BE2, #6A5ACD);
+        }
+        
+        .bar-text {
+            min-width: 120px;
+            font-weight: bold;
+            font-size: 14px;
+            color: #2c3e50;
+            text-align: center;
+        }
+
+        #gameContainer {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        #leftSidebar {
+            width: 200px;
+            min-height: 600px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        #rightSidebar {
+            width: 200px;
+            min-height: 600px;
+            position: relative;
+        }
+
+        .banner-ad {
+            width: 100%;
+            height: 250px;
+            background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
+            border: 2px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 10px 0;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+
+        #adPopup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #9932CC, #8A2BE2);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            display: none;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        #adPopup button {
+            background: #FFD700;
+            color: #333;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+
+        #adPopup button:hover {
+            background: #FFA500;
+            transform: scale(1.1);
+        }
+
+        #adPopup .close-btn {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            background: none;
+            color: white;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+        }
+
+        /* Shop Modal Styles */
+        #shopModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            z-index: 1000;
+        }
+
+        .shop-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .coin-bank {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            color: #333;
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .shop-section {
+            margin: 20px 0;
+        }
+
+        .shop-section h3 {
+            color: #3498db;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .shop-item {
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .shop-item.selected {
+            border-color: #2ecc71;
+            background: #e8f5e8;
+        }
+
+        .shop-item.locked {
+            opacity: 0.6;
+        }
+
+        .item-preview {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            border: 2px solid #333;
+        }
+
+        .character-preview {
+            border-radius: 0;
+        }
+
+        .defense-preview {
+            border-radius: 10px;
+        }
+
+        .item-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .item-description {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+
+        .item-action button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .item-action button:hover:not(:disabled) {
+            background: #2980b9;
+        }
+
+        .item-action button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .unequip-btn {
+            background: #e74c3c !important;
+            color: white !important;
+        }
+
+        .unequip-btn:hover:not(:disabled) {
+            background: #c0392b !important;
+        }
+
+        .equip-btn {
+            background: #27ae60 !important;
+            color: white !important;
+        }
+
+        .equip-btn:hover:not(:disabled) {
+            background: #229954 !important;
+        }
+
+        .shop-close {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .shop-close:hover {
+            background: #c0392b;
+        }
+
+        .shop-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            color: #333;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 100;
+        }
+
+        .shop-button:hover {
+            transform: scale(1.05);
+        }
+
+        /* Freeplay UI */
+        .freeplay-button {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: linear-gradient(45deg, #8A2BE2, #6A5ACD);
+            color: #fff;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 100;
+            transition: transform 0.1s ease-in-out;
+        }
+        .freeplay-button:hover { transform: scale(1.05); }
+
+        .mode-badge {
+            display: none;
+            background: linear-gradient(45deg, #8A2BE2, #6A5ACD);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            margin-top: -10px;
+            margin-bottom: 10px;
+        }
+
+        /* Versus UI */
+        .versus-button {
+            position: fixed;
+            bottom: 20px;
+            left: 200px;
+            background: linear-gradient(45deg, #e67e22, #d35400);
+            color: #fff;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 100;
+            transition: transform 0.1s ease-in-out;
+        }
+        .versus-button:hover { transform: scale(1.05); }
+
+        /* Versus Modals */
+        #versusModal, #versusEndModal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            z-index: 1100;
+        }
+        .versus-content {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            width: 900px;
+            max-width: 95vw;
+            max-height: 85vh;
+            overflow: auto;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+        .versus-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 10px;
+        }
+        .versus-section h3 { margin: 8px 0; color: #2c3e50; }
+        .option-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+        .option-card {
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .option-card.selected { border-color: #2ecc71; background: #eaf7ea; }
+        .option-preview { width: 48px; height: 48px; border-radius: 8px; margin: 0 auto 8px; border: 2px solid #333; }
+        .controls-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+        .controls-row input[type=range] { flex: 1; }
+        .versus-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+        .btn {
+            background: #3498db; color: #fff; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer;
+        }
+        .btn.secondary { background: #95a5a6; }
+        .btn.danger { background: #e74c3c; }
+
+        /* 1v1 scoreboard */
+        #versusInfo { display: none; gap: 20px; }
+        #versusInfo .score { background: rgba(255,255,255,0.9); }
+    </style>
+</head>
+<body>
+    <!-- Google Authentication Container -->
+    <div class="auth-container" id="authContainer">
+        <div id="signInContainer">
+            <!-- Replace with your actual Google OAuth Client ID from Google Cloud Console -->
+            <!-- Get it from: https://console.cloud.google.com/apis/credentials -->
+            <div id="g_id_onload"
+                 data-client_id="805780499266-r5or58uj99h33u6pvalaulb2secsa3.apps.googleusercontent.com"
+                 data-callback="handleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin google-signin" 
+                 data-type="standard"
+                 data-size="medium"
+                 data-theme="outline"
+                 data-text="sign_in_with"
+                 data-shape="rectangular"
+                 data-logo_alignment="left">
+            </div>
+        </div>
+        
+        <div id="userContainer" style="display: none;">
+            <div class="user-info">
+                <img id="userAvatar" class="user-avatar" src="" alt="User Avatar">
+                <div>
+                    <div id="userName" class="user-name"></div>
+                    <div id="syncStatus" class="sync-status">Data synced ✓</div>
+                </div>
+            </div>
+            <button class="sign-out-btn" onclick="signOut()">Sign Out</button>
+        </div>
+    </div>
+
+    <h1>⚽ Keepie Upie ⚽</h1>
+    <div id="modeBadge" class="mode-badge">Freeplay Mode</div>
+    <div id="controls">
+        Use A/D or ← → arrow keys to move • W/↑/SPACEBAR to jump • S or ↓ to crouch • Keep the ball in the air!
+    </div>
+    <div id="gameInfo">
+        <div class="score">Score: <span id="score">0</span></div>
+        <div class="score">Best: <span id="bestScore">0</span></div>
+        <div class="score">Coins: <span id="coins">0</span>/10</div>
+        <div class="score">Bank: <span id="totalCoins">0</span> 🪙</div>
+    </div>
+    <div id="versusInfo">
+        <div class="score">P1: <span id="p1Score">0</span></div>
+        <div class="score">P2: <span id="p2Score">0</span></div>
+        <div class="score">Time: <span id="matchTimer">0:00</span></div>
+        <div class="score">Points to Win: <span id="pointsCapLabel">5</span></div>
+    </div>
+
+    <div id="gameContainer">
+        <div id="leftSidebar">
+            <h3 style="text-align: center; margin-top: 0;">Sponsors</h3>
+            <div class="banner-ad">
+                <!-- AdMob Banner Ad Placeholder -->
+                <div>AdMob<br>Banner Ad<br>728x90</div>
+            </div>
+            <div class="banner-ad">
+                <!-- Unity Ads Banner Placeholder -->
+                <div>Unity Ads<br>Banner Ad<br>320x50</div>
+            </div>
+            <div class="banner-ad">
+                <!-- AppLovin Banner Placeholder -->
+                <div>AppLovin<br>Banner Ad<br>300x250</div>
+            </div>
+        </div>
+        
+        <div>
+            <canvas id="gameCanvas" width="1000" height="700"></canvas>
+            <div id="startOverlay">
+                <h2>Keepie Upie</h2>
+                <p>Click start to begin keeping the ball in the air!</p>
+                <button onclick="startMainGame()">Start</button>
+            </div>
+            <div id="healthBarsContainer">
+                <div id="healthBar" class="status-bar">
+                    <div class="bar-background">
+                        <div id="healthFill" class="bar-fill health-fill"></div>
+                    </div>
+                    <span id="healthText" class="bar-text">Health: 100/100</span>
+                </div>
+                <div id="shieldBar" class="status-bar" style="display: none;">
+                    <div class="bar-background">
+                        <div id="shieldFill" class="bar-fill shield-fill"></div>
+                    </div>
+                    <span id="shieldText" class="bar-text">Shield: 50/50</span>
+                </div>
+                <!-- New: Level bar -->
+                <div id="levelBar" class="status-bar">
+                    <div class="bar-background">
+                        <div id="levelFill" class="bar-fill level-fill" style="width: 0%"></div>
+                    </div>
+                    <span id="levelText" class="bar-text">Level 1 — Next: 30s</span>
+                </div>
+            </div>
+            <div id="powerupTimers"></div>
+        </div>
+        
+        <div id="rightSidebar">
+            <div id="adPopup">
+                <button class="close-btn" onclick="closeAdPopup()">×</button>
+                <h3>🎁 Bonus Offer!</h3>
+                <p>Watch a 30-second ad to get<br><strong>2X COINS</strong> for 5 minutes!</p>
+                <button onclick="watchRewardedAd()">Watch Ad</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <p>You kept the ball up <span id="finalBounces">0</span> times!</p>
+        <p>Level Reached: <span id="finalLevel">1</span></p>
+        <button onclick="restartGame()">Play Again</button>
+    </div>
+
+    <!-- Shop Modal -->
+    <div id="shopModal">
+        <div class="shop-content">
+            <div class="shop-header">
+                <h2>🏪 Coin Shop</h2>
+                <div class="coin-bank">🪙 <span id="totalCoinsShop">0</span> Coins</div>
+                <button class="shop-close" onclick="toggleShop()">×</button>
+            </div>
+            
+            <div class="shop-section">
+                <h3>⚽ Ball Skins</h3>
+                <div class="shop-grid" id="ballSkinsContainer">
+                    <!-- Ball skins will be populated by JavaScript -->
+                </div>
+            </div>
+            
+            <div class="shop-section">
+                <h3>👤 Characters</h3>
+                <div class="shop-grid" id="charactersContainer">
+                    <!-- Characters will be populated by JavaScript -->
+                </div>
+            </div>
+            
+            <div class="shop-section">
+                <h3>🛡️ Defense Equipment</h3>
+                <div class="shop-grid" id="defenseContainer">
+                    <!-- Defense items will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1v1 Setup Modal -->
+    <div id="versusModal">
+        <div class="versus-content">
+            <div class="versus-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <h2>1v1 Match Setup</h2>
+                <button class="btn danger" onclick="closeVersusSetup()">×</button>
+            </div>
+            <div class="versus-grid">
+                <div class="versus-section">
+                    <h3>Player 1 Character</h3>
+                    <div id="p1Characters" class="option-grid"></div>
+                </div>
+                <div class="versus-section">
+                    <h3>Player 2 Character</h3>
+                    <div id="p2Characters" class="option-grid"></div>
+                </div>
+            </div>
+            <div class="versus-section">
+                <h3>Ball Skin</h3>
+                <div id="ballOptions" class="option-grid"></div>
+            </div>
+            <div class="versus-section">
+                <h3>Match Options</h3>
+                <div class="controls-row">
+                    <label for="timeSlider" style="min-width:140px;">Match Length (mins)</label>
+                    <input id="timeSlider" type="range" min="1" max="20" value="5" oninput="updateVersusTimeLabel(this.value)">
+                    <span id="timeLabel">5</span>
+                </div>
+                <div class="controls-row">
+                    <label for="pointsSlider" style="min-width:140px;">Points to Win</label>
+                    <input id="pointsSlider" type="range" min="1" max="20" value="5" oninput="updateVersusPointsLabel(this.value)">
+                    <span id="pointsLabel">5</span>
+                </div>
+            </div>
+            <div class="versus-actions">
+                <button class="btn secondary" onclick="closeVersusSetup()">Cancel</button>
+                <button class="btn" onclick="startVersusMatch()">Start Match</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1v1 End Modal -->
+    <div id="versusEndModal">
+        <div class="versus-content" style="max-width:600px;">
+            <h2 id="versusResult">Match Over</h2>
+            <p>Final Score — P1: <span id="finalP1">0</span> • P2: <span id="finalP2">0</span></p>
+            <div class="versus-actions">
+                <button class="btn" onclick="restartVersusSameSettings()">Play Again</button>
+                <button class="btn secondary" onclick="exitVersusToHome()">Home</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Button -->
+    <button class="shop-button" onclick="toggleShop()">🏪 Shop</button>
+    <!-- Freeplay Button -->
+    <button class="freeplay-button" onclick="toggleFreeplay()">🎮 Freeplay</button>
+    <!-- 1v1 Button -->
+    <button class="versus-button" onclick="openVersusSetup()">🥅 1v1</button>
+
+    <script src="game.js"></script>
+</body>
+</html>
